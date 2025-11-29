@@ -1,52 +1,43 @@
 import requests
 import os
-import bcrypt
+from datetime import datetime, timedelta
 
 def send(message):
     try:
         requests.post(f"https://api.telegram.org/bot{os.environ['TELEGRAM_TOKEN']}/sendMessage",
-                      json={"chat_id": os.environ['TELEGRAM_CHAT_ID'], "text": message}, timeout=10)
+                      json={"chat_id": os.environ['TELEGRAM_CHAT_ID'], "text": message, "disable_web_page_preview": True}, timeout=10)
     except:
         pass
 
-def login():
-    email = os.environ['SORARE_EMAIL']
-    password = os.environ['SORARE_PASSWORD'].encode('utf-8')
-    
-    # Prendi salt
-    r = requests.get(f"https://api.sorare.com/api/v1/users/{email}", timeout=10)
-    if r.status_code != 200:
-        send(f"Salt fallito: {r.status_code}")
-        return None
-    salt = r.json()['salt'].encode('utf-8')
-    
-    hashed = bcrypt.hashpw(password, salt).decode('utf-8')
-    
-    # Mutation aggiornata 2025
-    query = """
-    mutation SignIn($email: String!, $password: String!) {
-      signIn(email: $email, password: $password) {
-        jwt
-        errors { message }
-      }
-    }
-    """
-    variables = {"email": email, "password": hashed}
-    resp = requests.post("https://api.sorare.com/graphql",
-                         json={"query": query, "variables": variables}, timeout=15)
-    data = resp.json().get("data", {}).get("signIn", {})
-    if data.get("errors"):
-        send(f"Login fallito: {data['errors'][0]['message']}")
-        return None
-    return data.get("jwt")
-
 def main():
-    send("Spaccatonio 2025 – test finale")
-    jwt = login()
-    if jwt:
-        send("LOGIN OK DEFINITIVO!\nBot gira ogni minuto.\nDomani mattina ti mando la versione con alert reali sotto 80%.")
-    else:
-        send("Ancora no – ma ci siamo quasi")
+    send("SPACCATONIO ATTIVO – cerco deal Limited/Rare 3-30€ sotto 80% floor")
+    
+    url = "https://api.sorare.com/api/v1/cards"
+    params = {
+        "query": "rarity:limited OR rarity:rare price:3..30",
+        "order_by": "created_at_desc",
+        "page": 1
+    }
+    
+    try:
+        r = requests.get(url, params=params, timeout=15)
+        cards = r.json().get("cards", [])
+        
+        for card in cards[:50]:  # primi 50 più recenti
+            price = float(card["latest_offer"]["price_eur"])
+            floor = float(card["player"]["floor_price_eur"] or 0)
+            name = card["player"]["display_name"]
+            rarity = card["rarity"].capitalize()
+            uuid = card["uuid"]
+            
+            if floor > 0 and price < floor * 0.8 and 3 <= price <= 30:
+                discount = int((floor - price) / floor * 100)
+                msg = f"SPACCATONIO ALERT!\n{name} ({rarity})\n{price}€ (floor {floor}€ → -{discount}%)\nhttps://sorare.com/cards/{uuid}"
+                send(msg)
+                
+        send("Scan completato – nessun altro deal trovato ora")
+    except:
+        send("Errore scan, riprovo fra 1 minuto")
 
 if __name__ == "__main__":
     main()
