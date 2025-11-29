@@ -26,12 +26,12 @@ def get_floor(player_slug, rarity):
     variables = {"slug": player_slug, "rarity": rarity.upper()}
     r = requests.post(url, json={"query": query, "variables": variables})
     data = r.json().get("data", {}).get("player", {}).get("cards", {}).get("nodes", [])
-    prices = [n["tokenAuction"]["currentAsk"] if n["tokenAuction"] else n["singleSaleOffer"]["price"] if n["singleSaleOffer"] else None for n in data]
+    prices = [node["tokenAuction"]["currentAsk"] if node["tokenAuction"] else node["singleSaleOffer"]["price"] if node["singleSaleOffer"] else None for node in data]
     prices = [p for p in prices if p]
     return min(prices) if prices else None
 
 def main():
-    send("Spaccatonio aggiornato – aste in scadenza + Buy Now")
+    send("Spaccatonio test 1-100€ ≤100% floor – scan attivo")
     
     url = "https://api.sorare.com/graphql"
     now = datetime.utcnow()
@@ -46,7 +46,7 @@ def main():
             card { rarity player { displayName slug } }
           }
         }
-        singleSaleOffers(first: 20, where: {rarity_in: [LIMITED, RARE], price_gte: 3, price_lte: 30, createdAt_gte: $start}) {
+        singleSaleOffers(first: 20, where: {rarity_in: [LIMITED, RARE], price_gte: 1, price_lte: 100, createdAt_gte: $start}) {
           nodes {
             id price(currency: EUR)
             card { rarity player { displayName slug } }
@@ -70,8 +70,8 @@ def main():
         player_slug = a["card"]["player"]["slug"]
         rarity = a["card"]["rarity"].upper()
         floor = get_floor(player_slug, rarity)
-        if remaining < 300 and 3 <= price <= 30 and floor and price < 0.8 * floor:
-            discount = int((floor - price) / floor * 100)
+        if remaining < 300 and 1 <= price <= 100 and floor and price <= floor:
+            discount = int((floor - price) / floor * 100) if floor > 0 else 0
             msg = f"ASTA SCADENZA! {a['card']['player']['displayName']} ({rarity}) {price}€ (floor {floor}€ -{discount}%, {remaining:.0f}s)\nhttps://sorare.com/cards/{a['id']}"
             send(msg)
     
@@ -81,12 +81,12 @@ def main():
         player_slug = o["card"]["player"]["slug"]
         rarity = o["card"]["rarity"].upper()
         floor = get_floor(player_slug, rarity)
-        if floor and price < 0.8 * floor:
-            discount = int((floor - price) / floor * 100)
+        if floor and price <= floor:
+            discount = int((floor - price) / floor * 100) if floor > 0 else 0
             msg = f"BUY NOW! {o['card']['player']['displayName']} ({rarity}) {price}€ (floor {floor}€ -{discount}%)\nhttps://sorare.com/cards/{o['id']}"
             send(msg)
     
-    send("Scan aste + Buy Now completato – prossimo tra 1 min")
+    send("Scan aste + Buy Now completato – prossimo tra 5 min")
 
 if __name__ == "__main__":
     main()
