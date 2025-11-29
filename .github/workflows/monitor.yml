@@ -2,8 +2,8 @@ name: Spaccatonio Monitor
 
 on:
   schedule:
-    - cron: '*/1 * * * *'   # ogni minuto
-  workflow_dispatch:       # per test manuale
+    - cron: '*/1 * * * *'
+  workflow_dispatch:
 
 jobs:
   run:
@@ -14,8 +14,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install requests
-        run: pip install requests
+      - name: Install dependencies
+        run: pip install requests bcrypt
       - name: Run bot
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
